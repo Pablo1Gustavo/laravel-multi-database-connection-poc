@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "kirschbaum-development/eloquent-power-joins": "dev-multiple-database-connections-support",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0"
     },
@@ -18,6 +19,7 @@
         "laravel/boost": "^2.2",
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",
+        "laravel/sail": "^1.57",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "phpunit/phpunit": "^12.5.12"
@@ -71,6 +73,12 @@
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ]
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/Pablo1Gustavo/eloquent-power-joins.git"
+        }
+    ],
     "extra": {
         "laravel": {
             "dont-discover": []
