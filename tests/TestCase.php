@@ -2,13 +2,13 @@
 
 namespace Tests;
 
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     protected $connectionsToTransact = ['primary', 'secondary'];
 
@@ -19,5 +19,17 @@ abstract class TestCase extends BaseTestCase
         }
 
         return parent::setUpTraits();
+    }
+
+    protected function migrateDatabases(): void
+    {
+        foreach ($this->connectionsToTransact as $connection) {
+            $this->artisan('db:wipe', [
+                '--database' => $connection,
+                '--force' => true,
+            ]);
+        }
+
+        $this->artisan('migrate', ['--force' => true]);
     }
 }
