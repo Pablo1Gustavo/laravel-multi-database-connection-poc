@@ -2,28 +2,23 @@
 
 namespace Tests;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
-    use RefreshDatabase;
+    use DatabaseTruncation;
 
-    protected $connectionsToTransact = ['primary', 'secondary'];
+    protected array $connectionsToTruncate = ['primary', 'secondary'];
 
-    protected function setUpTraits(): array
+    protected function beforeTruncatingDatabase(): void
     {
-        foreach ($this->connectionsToTransact as $connection) {
-            DB::connection($connection)->statement('SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
+        if (RefreshDatabaseState::$migrated) {
+            return;
         }
 
-        return parent::setUpTraits();
-    }
-
-    protected function migrateDatabases(): void
-    {
-        foreach ($this->connectionsToTransact as $connection) {
+        foreach ($this->connectionsToTruncate as $connection) {
             $this->artisan('db:wipe', [
                 '--database' => $connection,
                 '--force' => true,
@@ -31,5 +26,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         $this->artisan('migrate', ['--force' => true]);
+
+        RefreshDatabaseState::$migrated = true;
     }
 }
