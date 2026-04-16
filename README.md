@@ -1,58 +1,113 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Multi-Database Connection POC
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Proof of concept exercising cross-database Eloquent JOINs against three drivers
+(MySQL, PostgreSQL, SQLite) using a custom branch of
+[`kirschbaum-development/eloquent-power-joins`](https://github.com/kirschbaum-development/eloquent-power-joins).
 
-## About Laravel
+The branch under test is `dev-multiple-database-connections-support`, which
+adds a `ConnectionAwareTable` helper that emits qualified table/column refs
+(`"db"."table"."col"` or aliased `"prefix_table" as "table"`) when the related
+model lives on a different connection from the base query.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Domain
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Two logical databases, two Laravel connections (`primary`, `secondary`):
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Connection  | Tables                                                     |
+| ----------- | ---------------------------------------------------------- |
+| `primary`   | `authors`, `author_tag`, `labelables`                      |
+| `secondary` | `articles`, `comments`, `profiles`, `tags`, `labels`, `stickers` |
 
-## Learning Laravel
+Relationships span connections (e.g. `Author hasMany Articles`,
+`Author belongsToMany Tags through author_tag`), so most controller queries
+require cross-connection JOINs.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Switching driver
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+`./switch-db.sh {mysql|pgsql|sqlite}` rewrites the relevant `DB_*` keys in
+`.env` for the chosen driver. The script is the only supported way to switch
+— `phpunit.xml` no longer overrides connection envs.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```sh
+./switch-db.sh mysql   # mysql 8.4 via sail
+./switch-db.sh pgsql   # postgres 18 via sail
+./switch-db.sh sqlite  # local files in database/
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+For mysql/pgsql, start the database services first:
 
-## Contributing
+```sh
+./vendor/bin/sail up -d mysql pgsql
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+SQLite needs no service — the script creates the files locally.
 
-## Code of Conduct
+## Running tests
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```sh
+php artisan test
+```
 
-## Security Vulnerabilities
+The base `Tests\TestCase` uses `DatabaseTruncation` across both connections.
+On the first test in a run it wipes and re-migrates both databases via
+`db:wipe` + `migrate`; subsequent tests truncate.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Architecture decisions
 
-## License
+### Why one server per driver
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Cross-connection JOINs have to execute on a single server: MySQL needs the
+two databases on the same MySQL instance; PostgreSQL needs them on the same
+cluster; SQLite needs the other file `ATTACH`ed. The compose file therefore
+runs `mysql` and `pgsql` services that each host both `laravel_primary` and
+`laravel_secondary`.
+
+### Per-driver layout
+
+| Driver | Layout                                                                |
+| ------ | --------------------------------------------------------------------- |
+| mysql  | Two physical databases (`laravel_primary`, `laravel_secondary`) on one server. Cross-DB refs use `db.table` syntax that MySQL resolves natively. |
+| pgsql  | One physical database (`laravel_primary`) with two schemas (`laravel_primary`, `laravel_secondary`). Cross-schema refs use `schema.table` syntax. |
+| sqlite | Two files (`database/laravel_primary.sqlite`, `database/laravel_secondary.sqlite`). Cross-file refs use `schema.table` syntax made available via `ATTACH DATABASE`. |
+
+The `DB_*_SCHEMA` env vars hold the schema/attach name for pgsql and sqlite.
+For mysql the schema name and the database name are the same thing, so
+`DB_*_SCHEMA` is left unset.
+
+### `AppServiceProvider` connection listener
+
+`app/Providers/AppServiceProvider.php` listens on `ConnectionEstablished` and
+performs two driver-specific tweaks:
+
+1. **Override the reported database name** for pgsql and sqlite so the
+   library can emit `"<schema>"."<table>"` qualifiers on cross-connection
+   refs. Laravel's pgsql driver normally reports the physical database name;
+   we replace it with the schema, since `ConnectionAwareTable::qualifiedDatabaseName()`
+   uses whatever the connection reports.
+
+2. **`ATTACH DATABASE`** for sqlite: when one sqlite connection opens, every
+   other sqlite connection's file is attached under its `schema` name. After
+   that, queries on this connection can reference the other file as
+   `<schema>.<table>` exactly like MySQL/Postgres.
+
+Doing this in a `ConnectionEstablished` listener keeps the test setup minimal
+(`Tests\TestCase` doesn't have to know which driver is active) and ensures
+ATTACH runs once per PDO open, including for connections Laravel creates
+internally for migrations or test truncation.
+
+### `config/database.php`
+
+Both connections share the same shape and read every value from `DB_*` env
+vars, so the switch script only has to mutate `.env`. The `schema` key is
+present for both connections so pgsql/sqlite paths in the listener can read
+it through `$connection->getConfig()`.
+
+### `tests/TestCase.php`
+
+`DatabaseTruncation` is configured with `connectionsToTruncate = ['primary',
+'secondary']` so both databases are truncated between tests. The
+`beforeTruncatingDatabase()` hook gates a one-shot `db:wipe` + `migrate`
+behind `RefreshDatabaseState::$migrated`, which mirrors what `RefreshDatabase`
+does internally but works across multiple connections without the per-test
+transaction wrapper.
+
