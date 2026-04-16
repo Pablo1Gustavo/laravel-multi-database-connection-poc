@@ -22,14 +22,12 @@ services:
         networks:
             - sail
         depends_on:
-            - mysql-1
-            - mysql-2
-            - pgsql-1
-            - pgsql-2
-    mysql-1:
+            - mysql
+            - pgsql
+    mysql:
         image: 'mysql:8.4'
         ports:
-            - '${FORWARD_MYSQL1_PORT:-3306}:3306'
+            - '${FORWARD_MYSQL_PORT:-3306}:3306'
         environment:
             MYSQL_ROOT_PASSWORD: '${DB_PRIMARY_PASSWORD}'
             MYSQL_ROOT_HOST: '%'
@@ -38,8 +36,8 @@ services:
             MYSQL_PASSWORD: '${DB_PRIMARY_PASSWORD}'
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
         volumes:
-            - 'sail-mysql-1:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            - 'sail-mysql:/var/lib/mysql'
+            - './database/schema/mysql-init.sql:/docker-entrypoint-initdb.d/10-create-databases.sql'
         networks:
             - sail
         healthcheck:
@@ -50,42 +48,18 @@ services:
                 - '-p${DB_PRIMARY_PASSWORD}'
             retries: 3
             timeout: 5s
-    mysql-2:
-        image: 'mysql:8.4'
-        ports:
-            - '${FORWARD_MYSQL2_PORT:-3307}:3306'
-        environment:
-            MYSQL_ROOT_PASSWORD: '${DB_SECONDARY_PASSWORD}'
-            MYSQL_ROOT_HOST: '%'
-            MYSQL_DATABASE: '${DB_SECONDARY_DATABASE}'
-            MYSQL_USER: '${DB_SECONDARY_USERNAME}'
-            MYSQL_PASSWORD: '${DB_SECONDARY_PASSWORD}'
-            MYSQL_ALLOW_EMPTY_PASSWORD: 1
-        volumes:
-            - 'sail-mysql-2:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
-        networks:
-            - sail
-        healthcheck:
-            test:
-                - CMD
-                - mysqladmin
-                - ping
-                - '-p${DB_SECONDARY_PASSWORD}'
-            retries: 3
-            timeout: 5s
-    pgsql-1:
+    pgsql:
         image: 'postgres:18-alpine'
         ports:
-            - '${FORWARD_PGSQL1_PORT:-5432}:5432'
+            - '${FORWARD_PGSQL_PORT:-5432}:5432'
         environment:
             PGPASSWORD: '${DB_PRIMARY_PASSWORD:-secret}'
             POSTGRES_DB: '${DB_PRIMARY_DATABASE}'
             POSTGRES_USER: '${DB_PRIMARY_USERNAME}'
             POSTGRES_PASSWORD: '${DB_PRIMARY_PASSWORD:-secret}'
         volumes:
-            - 'sail-pgsql-1:/var/lib/postgresql/data'
-            - './vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
+            - 'sail-pgsql:/var/lib/postgresql/data'
+            - './database/schema/pgsql-init.sql:/docker-entrypoint-initdb.d/10-create-databases.sql'
         networks:
             - sail
         healthcheck:
@@ -99,40 +73,11 @@ services:
                 - '${DB_PRIMARY_USERNAME}'
             retries: 3
             timeout: 5s
-    pgsql-2:
-        image: 'postgres:18-alpine'
-        ports:
-            - '${FORWARD_PGSQL2_PORT:-5433}:5432'
-        environment:
-            PGPASSWORD: '${DB_SECONDARY_PASSWORD:-secret}'
-            POSTGRES_DB: '${DB_SECONDARY_DATABASE}'
-            POSTGRES_USER: '${DB_SECONDARY_USERNAME}'
-            POSTGRES_PASSWORD: '${DB_SECONDARY_PASSWORD:-secret}'
-        volumes:
-            - 'sail-pgsql-2:/var/lib/postgresql/data'
-            - './vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
-        networks:
-            - sail
-        healthcheck:
-            test:
-                - CMD
-                - pg_isready
-                - '-q'
-                - '-d'
-                - '${DB_SECONDARY_DATABASE}'
-                - '-U'
-                - '${DB_SECONDARY_USERNAME}'
-            retries: 3
-            timeout: 5s
 networks:
     sail:
         driver: bridge
 volumes:
-    sail-mysql-1:
+    sail-mysql:
         driver: local
-    sail-mysql-2:
-        driver: local
-    sail-pgsql-1:
-        driver: local
-    sail-pgsql-2:
+    sail-pgsql:
         driver: local

@@ -34,9 +34,9 @@ return [
 
         'primary' => [
             'driver' => env('DB_PRIMARY_DRIVER', 'mysql'),
-            'host' => env('DB_PRIMARY_HOST', 'mysql-1'),
+            'host' => env('DB_PRIMARY_HOST', 'mysql'),
             'port' => env('DB_PRIMARY_PORT', '3306'),
-            'database' => env('DB_PRIMARY_DATABASE', 'laravel'),
+            'database' => env('DB_PRIMARY_DATABASE', 'laravel_primary'),
             'username' => env('DB_PRIMARY_USERNAME', 'sail'),
             'password' => env('DB_PRIMARY_PASSWORD', 'password'),
             'unix_socket' => env('DB_PRIMARY_SOCKET', ''),
@@ -55,7 +55,7 @@ return [
 
         'secondary' => [
             'driver' => env('DB_SECONDARY_DRIVER', 'mysql'),
-            'host' => env('DB_SECONDARY_HOST', 'mysql-2'),
+            'host' => env('DB_SECONDARY_HOST', 'mysql'),
             'port' => env('DB_SECONDARY_PORT', '3306'),
             'database' => env('DB_SECONDARY_DATABASE', 'laravel_secondary'),
             'username' => env('DB_SECONDARY_USERNAME', 'sail'),

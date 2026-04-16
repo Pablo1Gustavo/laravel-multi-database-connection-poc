@@ -1,0 +1,2 @@
+CREATE DATABASE IF NOT EXISTS laravel_primary;
+CREATE DATABASE IF NOT EXISTS laravel_secondary;

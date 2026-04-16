@@ -1059,12 +1059,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Pablo1Gustavo/eloquent-power-joins.git",
-                "reference": "58cdde903f3864e292eca024dd4bcda6d9ec2be3"
+                "reference": "b605cce73ab3e065c622dc863ab871a6bda315d0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Pablo1Gustavo/eloquent-power-joins/zipball/58cdde903f3864e292eca024dd4bcda6d9ec2be3",
-                "reference": "58cdde903f3864e292eca024dd4bcda6d9ec2be3",
+                "url": "https://api.github.com/repos/Pablo1Gustavo/eloquent-power-joins/zipball/b605cce73ab3e065c622dc863ab871a6bda315d0",
+                "reference": "b605cce73ab3e065c622dc863ab871a6bda315d0",
                 "shasum": ""
             },
             "require": {
@@ -1128,7 +1128,7 @@
             "support": {
                 "source": "https://github.com/Pablo1Gustavo/eloquent-power-joins/tree/multiple-database-connections-support"
             },
-            "time": "2026-04-16T05:21:33+00:00"
+            "time": "2026-04-16T07:32:27+00:00"
         },
         {
             "name": "laravel/framework",
